@@ -46,19 +46,35 @@ mode = "local"
 
 Each tester should use their own AWS account or assigned sandbox account.
 
-1. Configure an AWS CLI profile on your machine:
+1. Find the AWS profile names already configured on your machine:
+
+```bash
+aws configure list-profiles
+```
+
+The profile name is the value you put in `.streamlit/secrets.toml`:
+
+```toml
+[aws]
+profile = "YOUR_PROFILE_NAME"
+```
+
+2. If you do not have a profile yet, create one:
 
 ```bash
 aws configure --profile YOUR_PROFILE_NAME
 ```
 
-2. Confirm the profile points to the expected account:
+3. Find the AWS account ID for that profile:
 
 ```bash
-aws sts get-caller-identity --profile YOUR_PROFILE_NAME
+aws sts get-caller-identity \
+  --profile YOUR_PROFILE_NAME \
+  --query Account \
+  --output text
 ```
 
-3. Copy those values into `.streamlit/secrets.toml`:
+4. Copy the profile name and account ID into `.streamlit/secrets.toml`:
 
 ```toml
 [aws]
