@@ -1,0 +1,19 @@
+[client]
+toolbarMode = "minimal"
+showErrorDetails = "none"
+
+[browser]
+gatherUsageStats = false
+
+[server]
+enableCORS = false
+enableXsrfProtection = false
+
+[theme]
+base = "light"
+primaryColor = "#2f7d52"
+backgroundColor = "#f7f8f5"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#202725"
+font = "sans-serif"
+baseRadius = "8px"
