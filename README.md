@@ -2,14 +2,13 @@
 
 Maintainer: `song9fl`
 
-I built this repository as a tester-facing Streamlit chatbot for Amazon Bedrock Knowledge Bases. The app uses `bedrock-agent-runtime.retrieve_and_generate`, a saved custom generation prompt, and optional local or AWS-backed conversation history.
+I built this repository as a local tester-facing Streamlit chatbot for Amazon Bedrock Knowledge Bases. The app uses `bedrock-agent-runtime.retrieve_and_generate`, a saved custom generation prompt, and local JSONL conversation history for testing.
 
 ## What Testers Can Check
 
 - Run the unit tests without AWS.
 - Start the Streamlit UI locally.
 - Connect the chatbot to a Bedrock Knowledge Base by filling in local secrets.
-- Review the AWS deployment templates for ECS/Fargate, DynamoDB, S3, ECR, and CodeBuild.
 
 The real local secrets file is ignored by git. Do not commit `.streamlit/secrets.toml`.
 
@@ -71,17 +70,6 @@ knowledge_base_id = "ZFBRFHC0OO"
 model_arn = "arn:aws:bedrock:us-east-1:YOUR_AWS_ACCOUNT_ID:inference-profile/us.meta.llama4-maverick-17b-instruct-v1:0"
 ```
 
-For AWS deployment, keep these values ready:
-
-```text
-AWS_PROFILE=YOUR_PROFILE_NAME
-AWS_REGION=us-east-1
-ACCOUNT_ID=YOUR_AWS_ACCOUNT_ID
-KB_ID=ZFBRFHC0OO
-KB_ARN=arn:aws:bedrock:us-east-1:YOUR_AWS_ACCOUNT_ID:knowledge-base/ZFBRFHC0OO
-MODEL_ARN=arn:aws:bedrock:us-east-1:YOUR_AWS_ACCOUNT_ID:inference-profile/us.meta.llama4-maverick-17b-instruct-v1:0
-```
-
 The Knowledge Base ID is included for this project. Do not copy my credentials, AWS profile name, access keys, account ID, or deployed URLs. Use your own AWS profile unless I explicitly give you limited test credentials.
 
 ## Run Tests
@@ -123,54 +111,26 @@ The app hides Streamlit configuration controls from the user-facing interface. B
 
 ## Conversation History
 
-Local testing:
+Local testing uses local JSONL history:
 
 ```text
 CHAT_HISTORY_MODE=local
 ```
 
-Production AWS use:
-
-```text
-CHAT_HISTORY_MODE=aws
-CHAT_HISTORY_DYNAMODB_TABLE=YOUR_DYNAMODB_TABLE
-CHAT_HISTORY_S3_BUCKET=YOUR_HISTORY_BUCKET
-CHAT_HISTORY_S3_PREFIX=chat-history
-```
-
-In AWS mode, the app stores durable history by school ID:
-
-```text
-pk = SCHOOL#{school_id}
-```
-
-When the same school ID returns, the app loads recent prior messages and sends a bounded history context to Bedrock with the current question. S3 stores a JSON event copy for every chat event.
-
-## AWS Deployment
-
-For my reusable AWS deployment procedure, see:
-
-```text
-docs/aws-deployment-runbook.md
-```
-
-The current supported hosting path is ECS Fargate behind an Application Load Balancer. Streamlit requires a working WebSocket route, and the ECS/ALB template is configured for that behavior.
+The app asks for a school ID first. Local chat history is written to `logs/chat_history.jsonl`, which is ignored by git.
 
 ## Main Files
 
 - `app.py`: Streamlit UI and chat flow
 - `bedrock_kb.py`: Bedrock Knowledge Base request builder and response helpers
-- `history_store.py`: local JSONL and AWS DynamoDB/S3 history logging
+- `history_store.py`: local JSONL history logging helpers
 - `prompts/generation_prompt.txt`: saved generation prompt
 - `.streamlit/secrets.example.toml`: local configuration template
-- `deploy/aws-history-resources.yml`: DynamoDB, S3, and runtime IAM role
-- `deploy/aws-build-resources.yml`: S3 source bucket and CodeBuild image builder
-- `deploy/aws-ecs-fargate-service.yml`: ECS Fargate and ALB service
-- `docs/aws-deployment-runbook.md`: AWS deployment guide
+- `tests/`: unit tests that do not call AWS
 
-## Required AWS Permissions
+## Local AWS Permissions
 
-The runtime role for production needs access to:
+The local AWS profile needs permission to call the Knowledge Base and model:
 
 ```text
 bedrock:Retrieve
@@ -178,9 +138,6 @@ bedrock:RetrieveAndGenerate
 bedrock:GetInferenceProfile
 bedrock:InvokeModel
 bedrock:InvokeModelWithResponseStream
-dynamodb:PutItem
-dynamodb:Query
-s3:PutObject
 ```
 
 If you use a Bedrock inference profile, make sure the role can invoke the underlying foundation model resources that the profile routes to.
