@@ -1,0 +1,128 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: App Runner service for the Bedrock KB Streamlit chatbot.
+
+Parameters:
+  AppName:
+    Type: String
+    Default: bedrock-kb-chatbot
+  ImageUri:
+    Type: String
+    Description: Full ECR image URI, including tag.
+  RuntimeRoleArn:
+    Type: String
+    Description: IAM role ARN used by the running App Runner instances.
+  EcrRepositoryArn:
+    Type: String
+    Description: ARN of the ECR repository that stores the chatbot image.
+  AwsRegion:
+    Type: String
+    Default: us-east-1
+  BedrockKnowledgeBaseId:
+    Type: String
+  BedrockModelArn:
+    Type: String
+  ChatHistoryTable:
+    Type: String
+  ChatHistoryBucket:
+    Type: String
+  ChatHistoryPrefix:
+    Type: String
+    Default: chat-history
+
+Resources:
+  AppRunnerEcrAccessRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppName}-apprunner-ecr-access-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: build.apprunner.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: AppRunnerEcrPullPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:BatchGetImage
+                  - ecr:DescribeImages
+                  - ecr:GetDownloadUrlForLayer
+                Resource: !Ref EcrRepositoryArn
+
+  AppRunnerService:
+    Type: AWS::AppRunner::Service
+    Properties:
+      ServiceName: !Ref AppName
+      InstanceConfiguration:
+        Cpu: "1 vCPU"
+        Memory: "2 GB"
+        InstanceRoleArn: !Ref RuntimeRoleArn
+      HealthCheckConfiguration:
+        Protocol: HTTP
+        Path: /_stcore/health
+        Interval: 20
+        Timeout: 5
+        HealthyThreshold: 1
+        UnhealthyThreshold: 5
+      SourceConfiguration:
+        AuthenticationConfiguration:
+          AccessRoleArn: !GetAtt AppRunnerEcrAccessRole.Arn
+        AutoDeploymentsEnabled: false
+        ImageRepository:
+          ImageIdentifier: !Ref ImageUri
+          ImageRepositoryType: ECR
+          ImageConfiguration:
+            Port: "8501"
+            RuntimeEnvironmentVariables:
+              - Name: AWS_REGION
+                Value: !Ref AwsRegion
+              - Name: APP_ENV
+                Value: production
+              - Name: BEDROCK_KB_ID
+                Value: !Ref BedrockKnowledgeBaseId
+              - Name: BEDROCK_MODEL_ARN
+                Value: !Ref BedrockModelArn
+              - Name: BEDROCK_NUMBER_OF_RESULTS
+                Value: "5"
+              - Name: BEDROCK_SEARCH_TYPE
+                Value: DEFAULT
+              - Name: BEDROCK_MAX_TOKENS
+                Value: "2048"
+              - Name: BEDROCK_TEMPERATURE
+                Value: "0.2"
+              - Name: BEDROCK_TOP_P
+                Value: "0.9"
+              - Name: BEDROCK_QUERY_DECOMPOSITION
+                Value: "false"
+              - Name: CHAT_HISTORY_MODE
+                Value: aws
+              - Name: CHAT_HISTORY_DYNAMODB_TABLE
+                Value: !Ref ChatHistoryTable
+              - Name: CHAT_HISTORY_S3_BUCKET
+                Value: !Ref ChatHistoryBucket
+              - Name: CHAT_HISTORY_S3_PREFIX
+                Value: !Ref ChatHistoryPrefix
+              - Name: CHAT_HISTORY_CONTEXT_MESSAGE_LIMIT
+                Value: "40"
+              - Name: CHAT_HISTORY_CONTEXT_MAX_CHARS
+                Value: "6000"
+      NetworkConfiguration:
+        EgressConfiguration:
+          EgressType: DEFAULT
+
+Outputs:
+  ServiceArn:
+    Value: !GetAtt AppRunnerService.ServiceArn
+  ServiceUrl:
+    Value: !GetAtt AppRunnerService.ServiceUrl
+  EcrAccessRoleArn:
+    Value: !GetAtt AppRunnerEcrAccessRole.Arn
